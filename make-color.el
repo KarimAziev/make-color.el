@@ -1,4 +1,4 @@
-;;; make-color.el --- Alternative to picking color - update fg/bg color by pressing r/g/b/... keys
+;;; make-color.el --- Alternative to picking color - update fg/bg color by pressing r/g/b/... keys -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2014 Alex Kost
 
@@ -7,6 +7,7 @@
 ;; Version: 0.4.1
 ;; URL: https://github.com/alezost/make-color.el
 ;; Keywords: color
+;; Package-Requires: ((emacs "28.1"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -59,10 +60,12 @@
 
 (require 'color)
 (require 'cl-macs)
+(require 'facemenu)
 
 (defgroup make-color nil
   "Find suitable color by modifying a text sample."
   :group 'faces)
+
 
 (defcustom make-color-shift-step 0.02
   "Step of shifting a component of the current color.
@@ -148,21 +151,21 @@ Should accept 4 arguments:
 
 (defvar make-color-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\C-j" 'newline)
-    (define-key map "\C-m" 'make-color-set-current-color)
-    (define-key map "n" 'make-color-set-probing-region)
-    (define-key map "p" 'make-color-set-step)
-    (define-key map "f" 'make-color-use-foreground)
-    (define-key map "d" 'make-color-use-background)
-    (define-key map "t" 'make-color-toggle-face-parameter)
-    (define-key map "k" 'make-color-current-color-to-kill-ring)
-    (define-key map "F" 'make-color-foreground-color-to-kill-ring)
-    (define-key map "D" 'make-color-background-color-to-kill-ring)
-    (define-key map " " 'make-color-goto-region)
-    (define-key map "N" 'make-color-next-region)
-    (define-key map "P" 'make-color-previous-region)
-    (define-key map "u" 'undo)
-    (define-key map "q" 'bury-buffer)
+    (define-key map "\C-j" #'newline)
+    (define-key map "\C-m" #'make-color-set-current-color)
+    (define-key map "n" #'make-color-set-probing-region)
+    (define-key map "p" #'make-color-set-step)
+    (define-key map "f" #'make-color-use-foreground)
+    (define-key map "d" #'make-color-use-background)
+    (define-key map "t" #'make-color-toggle-face-parameter)
+    (define-key map "k" #'make-color-current-color-to-kill-ring)
+    (define-key map "F" #'make-color-foreground-color-to-kill-ring)
+    (define-key map "D" #'make-color-background-color-to-kill-ring)
+    (define-key map " " #'make-color-goto-region)
+    (define-key map "N" #'make-color-next-region)
+    (define-key map "P" #'make-color-previous-region)
+    (define-key map "u" #'undo)
+    (define-key map "q" #'bury-buffer)
     map)
   "Keymap containing make-color commands.")
 
@@ -196,7 +199,7 @@ RED/GREEN/BLUE are numbers from 0.0 to 1.0."
   "Return RGB color by modifying COLOR with HUE/SATURATION/LUMINANCE.
 COLOR and returning value are lists in a form (R G B).
 HUE/SATURATION/LUMINANCE are numbers from 0.0 to 1.0."
-  (let ((hsl (apply 'color-rgb-to-hsl color)))
+  (let ((hsl (apply #'color-rgb-to-hsl color)))
     (color-hsl-to-rgb
      (make-color-+ (list (car      hsl) hue) 'overlap)
      (make-color-+ (list (cadr     hsl) saturation))
@@ -572,7 +575,7 @@ Use `make-color-highlight-time' variable and
        (make-color-delete-highlight-overlay))
       (run-at-time
        (run-at-time make-color-highlight-time nil
-                    'make-color-delete-highlight-overlay))
+                    #'make-color-delete-highlight-overlay))
       (t (error "Unknown function for waiting %s"
                 make-color-highlight-wait-function)))))
 
@@ -633,7 +636,7 @@ If BUFFER is nil, use current buffer."
       (if bounds
           (progn
             (setq make-color-current-color color
-                  color (apply 'color-rgb-to-hex color))
+                  color (apply #'color-rgb-to-hex color))
             (funcall make-color-set-color-function
                      make-color-face-keyword color
                      (car bounds) (cdr bounds))
@@ -746,7 +749,7 @@ Interactively, prompt for STEP."
                 (concat "Color"
                         (and make-color-current-color
                              (format " (current: %s)"
-                                     (apply 'color-rgb-to-hex
+                                     (apply #'color-rgb-to-hex
                                             make-color-current-color)))
                         ": "))))
     (unless (string= color "")
@@ -794,7 +797,7 @@ See `make-color-new-color-after-region-change'."
 COLOR can be a string (color name or a hex value) or a list in a
 form (R G B)."
   (when (listp color)
-    (setq color (apply 'color-rgb-to-hex color)))
+    (setq color (apply #'color-rgb-to-hex color)))
   (kill-new color)
   (message "Color '%s' has been put into kill-ring." color))
 
@@ -867,6 +870,8 @@ form (R G B)."
    [("O" "Set Probing Region" make-color-set-probing-region)
     ("RET" "Set Current Color" make-color-set-current-color)]])
 
-(provide 'make-color)
 
+
+;;; make-color.el ends here
+(provide 'make-color)
 ;;; make-color.el ends here
