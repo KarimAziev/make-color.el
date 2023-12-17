@@ -463,6 +463,7 @@ Return nil if probing region is not defined."
   (make-color-get-region
    make-color-current-region-index))
 
+;;;###autoload
 (defun make-color-set-probing-region (&optional beg end force)
   "Use region between BEG and END for colorizing.
 If BEG or END is nil, use current region.  If there is no active
@@ -494,6 +495,7 @@ Return nil, if COMMAND is not bound."
               command (list (or map make-color-mode-map)) t)))
     (and key (key-description key))))
 
+;;;###autoload
 (defun make-color-goto-region (&optional arg)
   "Switch to the probing region number ARG and highlight it.
 Regions are enumerated from 0.
@@ -514,6 +516,7 @@ Negative ARG means count from the end of saved regions."
           (make-color-set-probing-region)))
     (make-color-highlight-current-region)))
 
+;;;###autoload
 (defun make-color-next-region (&optional arg)
   "Switch to the next probing region.
 With ARG, skip so many regions."
@@ -521,6 +524,7 @@ With ARG, skip so many regions."
   (or arg (setq arg 1))
   (make-color-goto-region (make-color-calc-index nil arg)))
 
+;;;###autoload
 (defun make-color-previous-region (&optional arg)
   "Switch to the previous probing region.
 With ARG, skip so many regions."
@@ -572,6 +576,7 @@ Use `make-color-highlight-time' variable and
       (t (error "Unknown function for waiting %s"
                 make-color-highlight-wait-function)))))
 
+;;;###autoload
 (defun make-color-highlight-current-region ()
   "Highlight current probing region.
 See `make-color-highlight-region' for details."
@@ -636,6 +641,57 @@ If BUFFER is nil, use current buffer."
                  (message "Current color: %s" color)))
         (make-color-set-probing-region)))))
 
+(defmacro make-color-with-other-window (&rest body)
+  "Execute BODY in other window.
+If other window doesn't exists, split selected window right."
+  `(with-selected-window
+       (let ((wind-target
+              (if (minibuffer-window-active-p (selected-window))
+                  (with-minibuffer-selected-window
+                    (let ((wind (selected-window)))
+                     (or
+                      (window-right wind)
+                      (window-left wind)
+                      (progn (split-window-sensibly) wind))))
+                (let ((wind (selected-window)))
+                 (or
+                  (window-right wind)
+                  (window-left wind)
+                  (progn (split-window-sensibly) wind))))))
+        wind-target)
+     (progn ,@body)))
+
+;;;###autoload
+(defun make-color-other-window (&optional arg)
+  "Create a new window with selected or sample text for color probing.
+
+Optional argument ARG is a raw prefix argument. If non-nil, it affects the
+behavior of the buffer creation."
+  (interactive "P")
+  (let (sample region)
+    (if (region-active-p)
+        (progn
+          (setq sample (buffer-substring (region-beginning)
+                                         (region-end)))
+          (when make-color-use-whole-sample
+            (setq region (cons nil nil))))
+      (setq sample make-color-sample
+            region (cons make-color-sample-beg
+                         make-color-sample-end)))
+    (let ((buff (make-color-get-buffer
+                 'clear
+                 (if make-color-use-single-buffer arg (null arg)))))
+      (make-color-with-other-window
+       (pop-to-buffer-same-window buff))
+      (with-current-buffer buff
+        (make-color-mode)
+        (insert sample)
+        (goto-char (point-min))
+        (and region
+             (make-color-set-probing-region
+              (car region)
+              (cdr region) t))))))
+
 ;;;###autoload
 (defun make-color (&optional arg)
   "Begin to make a color by modifying a text sample.
@@ -667,8 +723,10 @@ create a new buffer (with ARG, use an existing one)."
     (goto-char (point-min))
     (and region
          (make-color-set-probing-region
-          (car region) (cdr region) t))))
+          (car region)
+          (cdr region) t))))
 
+;;;###autoload
 (defun make-color-set-step (step)
   "Set `make-color-shift-step' to a value STEP.
 Interactively, prompt for STEP."
@@ -680,6 +738,7 @@ Interactively, prompt for STEP."
       (setq make-color-shift-step step)
     (error "Should be a value from 0.0 to 1.0")))
 
+;;;###autoload
 (defun make-color-set-current-color ()
   "Set current color to the prompted value and update probing region."
   (interactive)
@@ -706,6 +765,7 @@ See `make-color-new-color-after-region-change'."
                     (make-color-get-color-at-pos
                      make-color-face-keyword))))))))
 
+;;;###autoload
 (defun make-color-use-foreground ()
   "Set foreground as the parameter for further changing."
   (interactive)
@@ -713,6 +773,7 @@ See `make-color-new-color-after-region-change'."
   (make-color-update-current-color-maybe)
   (message "Foreground has been set for colorizing."))
 
+;;;###autoload
 (defun make-color-use-background ()
   "Set background as the parameter for further changing."
   (interactive)
@@ -720,6 +781,7 @@ See `make-color-new-color-after-region-change'."
   (make-color-update-current-color-maybe)
   (message "Background has been set for colorizing."))
 
+;;;###autoload
 (defun make-color-toggle-face-parameter ()
   "Switch between setting foreground and background."
   (interactive)
@@ -736,6 +798,7 @@ form (R G B)."
   (kill-new color)
   (message "Color '%s' has been put into kill-ring." color))
 
+;;;###autoload
 (defun make-color-current-color-to-kill-ring ()
   "Add current color to the `kill-ring'."
   (interactive)
@@ -754,6 +817,55 @@ form (R G B)."
   "Add background color at point to the `kill-ring'."
   (interactive)
   (make-color-to-kill-ring (make-color-background-color-at-point)))
+
+;;;###autoload (autoload 'make-color-menu "make-color" nil t)
+(transient-define-prefix make-color-menu ()
+  "Create a menu for color manipulation commands."
+  :transient-suffix #'transient--do-call
+  :refresh-suffixes t
+  :transient-non-suffix #'transient--do-stay
+  [[:if-not-derived make-color-mode
+    ("p" "Set Probing Region" make-color-set-probing-region)
+    ("RET" "Make color other window" make-color-other-window)
+    ("C-<return>" "Make color" make-color)]]
+  [:if-derived make-color-mode
+   ["RGB"
+    ("B" "Increase Blue" make-color-increase-blue)
+    ("b" "Decrease Blue" make-color-decrease-blue)
+    ("c" "Decrease Cyan" make-color-decrease-cyan)
+    ("C" "Increase Cyan" make-color-increase-cyan)
+    ("G" "Increase Green" make-color-increase-green)
+    ("g" "Decrease Green" make-color-decrease-green)
+    ("R" "Increase Red" make-color-increase-red)
+    ("r" "Decrease Red" make-color-decrease-red)
+    ("M" "Increase Magenta" make-color-increase-magenta)
+    ("m" "Decrease Magenta" make-color-decrease-magenta)
+    ("Y" "Increase Yellow" make-color-increase-yellow)
+    ("y" "Decrease Yellow" make-color-decrease-yellow)]
+   ["HSL"
+    ("h" "Decrease Hue (type of color)" make-color-decrease-hue)
+    ("H" "Increase Hue (type of color)" make-color-increase-hue)
+    ("S" "Increase Saturation (intensity)" make-color-increase-saturation)
+    ("s" "Decrease Saturation (intensity)" make-color-decrease-saturation)
+    ("l" "Decrease Luminance (brightness)" make-color-decrease-luminance)
+    ("L" "Increase Luminance (brightness)" make-color-increase-luminance)]
+   [("C-j" "Newline" newline)
+    ("N" "Next Region" make-color-next-region)
+    ("P" "Previous Region" make-color-previous-region)
+    ("SPC" "Goto Region" make-color-goto-region)]
+   [("d" "Use Background" make-color-use-background)
+    ("f" "Use Foreground" make-color-use-foreground)
+    ("p" "Set Step" make-color-set-step)]
+   [("t" "Toggle Face Parameter" make-color-toggle-face-parameter)
+    ("k" "Current Color To Kill Ring" make-color-current-color-to-kill-ring)
+    ("D" "Background Color To Kill Ring"
+     make-color-background-color-to-kill-ring)
+    ("F" "Foreground Color To Kill Ring"
+     make-color-foreground-color-to-kill-ring)
+    ("u" "Undo" undo)
+    ("Q" "Bury Buffer" bury-buffer)]
+   [("O" "Set Probing Region" make-color-set-probing-region)
+    ("RET" "Set Current Color" make-color-set-current-color)]])
 
 (provide 'make-color)
 
