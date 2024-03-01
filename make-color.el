@@ -58,6 +58,8 @@
 
 ;;; Code:
 
+(require 'transient)
+
 (require 'color)
 (require 'cl-macs)
 (require 'facemenu)
